@@ -1,0 +1,5 @@
+gradio
+python-escpos
+rich
+libusb-package
+pyusb
