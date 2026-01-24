@@ -1,5 +1,6 @@
-gradio
-python-escpos
+gradio==6.0.2
+python-escpos[usb]
 rich
 libusb-package
 pyusb
+opencv-python

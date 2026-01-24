@@ -6,12 +6,12 @@ import time
 import rich
 import numpy as np
 import PIL
-import cv2 as cv
 
 
 import escpos
 import escpos.printer
 
+import usb
 
 PAPER_STATUS_EMOJI = {
     0: "❌",
@@ -75,15 +75,17 @@ class Fax:
 
             # Scan
             if self.is_scan:
-                self.image = cv.adaptiveThreshold(
-                    np.array(self.image),  # No need RGB / BGR Madness
-                    255,
-                    cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-                    cv.THRESH_BINARY,
-                    63, # Block size 7
-                    8   # Float 2
-                )
-                self.image = PIL.Image.fromarray(self.image)
+                pass # TODO Cant opencv on pi zero
+                #import cv as cv
+                #self.image = cv.adaptiveThreshold(
+                #    np.array(self.image),  # No need RGB / BGR Madness
+                #    255,
+                #    cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+                #    cv.THRESH_BINARY,
+                #    63, # Block size 7
+                #    8   # Float 2
+                #)
+                #self.image = PIL.Image.fromarray(self.image)
 
 
     def get_str_content(self):
@@ -143,10 +145,11 @@ class Printer:
                 return False
             if not self.p.is_online():
                 # TRY BOOT
+                print("Printer not online, waiting...")
                 self.p.hw("INIT")
                 time.sleep(0.75)  # TODO LESS ?
                 if not self.p.is_online():
-                    print(f"Printer KO: Printer not booted in time")
+                    print(f"Printer did not boot in time")
                     return False  # TODO Return ORANGE status ?
 
 
@@ -156,6 +159,7 @@ class Printer:
             return False
         except usb.core.USBError as exc:
             print(f"Printer KO: Printer device unreachable, likely lost connection")
+            self.p._device.reset()  # TODO TRY
             self.p.close() # This is cleaner and possible here since we have a device
             return False
             # self.p.open()
