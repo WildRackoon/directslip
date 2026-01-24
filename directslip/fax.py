@@ -159,7 +159,6 @@ class Printer:
             return False
         except usb.core.USBError as exc:
             print(f"Printer KO: Printer device unreachable, likely lost connection")
-            self.p._device.reset()  # TODO TRY
             self.p.close() # This is cleaner and possible here since we have a device
             return False
             # self.p.open()
