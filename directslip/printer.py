@@ -96,7 +96,14 @@ class Printer:
 
 
     def print_test(self):
-        self.print_text("Test Print")
+        #self.print_text("Test Print")
+
+        for line_spacing in [0,96,128,192,255]:
+            self.p.line_spacing(line_spacing)
+            self.p.textln("Test Print")
+        self.p.line_spacing()
+        self.p.cut()
+
         #if self.image is not None:
         #    p.ln()
         #    p.image(self.image)

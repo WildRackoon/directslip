@@ -60,15 +60,16 @@ async def status(request):
 async def test(request):
     """Perform a test print"""
     request.app.printer.print_test()
-    #fax = directslip.fax.get_test_fax()
-    #fax.print(request.app.printer.p)
+    return {"status": "OK"}, 200
 
-@api_router.route('/text')
+@api_router.post('/text')
 async def text(request):
     """Perform a test print"""
-    rich.print(request)
+    rich.print(request.json)
+    if request.json is None:
+    	return {"error": "Bad Request", "message": "Bad Body"}, 400
     #request.app.printer.print_text()
-
+    return {"status": "OK"}, 200
 def cleanup():
   print("cleanup")
 
