@@ -6,12 +6,24 @@ import pathlib
 import microdot
 import rich
 
-import directslip
-import directslip.fax
-
+#import directslip
+#import directslip.fax
+import directslip.printer
 
 # ROOT
 root_router = microdot.Microdot()
+
+#@root_router.route('/favicon.ico')
+#def favicon(request):
+#    return microdot.send_file('server_api/favicon.ico', content_type='image/x-icon')
+
+@root_router.route('')
+def root(request):
+  """Root path"""
+  return {
+    "status": True,
+    "version": "1.0"
+  }
 
 @root_router.route('routes')
 async def list_routes(request):
@@ -31,24 +43,31 @@ async def list_routes(request):
 
 # API 
 api_router = microdot.Microdot()
+@api_router.before_request
+def preprocess_request(request):
+    if not request.app.printer.is_printer_ok():
+        return {"error": "Printer Offline"}, 503
+
 @api_router.route('/status')
 async def status(request):
-    if not request.app.printer.is_printer_ok():
-        return "FAX OFFLINE ❌: Retry later"  # Print exception ? TODO
-    return request.app.printer.status_str()
-  #return 'API HJELLO'
+    """Gives Printer Status"""
+    return {
+      "status": request.app.printer.status_str()
+    }
 
 # TODO ALWAYS MAKE SURE its online before sending anything
 @api_router.route('/test')
 async def test(request):
-    if not request.app.printer.is_printer_ok():
-        raise RuntimeError("Cannot connect to printer")
-    fax = directslip.fax.get_test_fax()
-    fax.print(request.app.printer.p)
+    """Perform a test print"""
+    request.app.printer.print_test()
+    #fax = directslip.fax.get_test_fax()
+    #fax.print(request.app.printer.p)
 
-
-def init():
-  print("init")
+@api_router.route('/text')
+async def text(request):
+    """Perform a test print"""
+    rich.print(request)
+    #request.app.printer.print_text()
 
 def cleanup():
   print("cleanup")
@@ -78,15 +97,16 @@ def get_config():
 
 
 async def main():
-    print("lets go")	
+    # APP CREATION
     app = microdot.Microdot()
     root_router.mount(api_router, url_prefix='api')
     app.mount(root_router, url_prefix='/')
 
-    # State
-
+    # CONFIG
     app.config = get_config()
 
+    # STATE
+    print(f"Initializing printer:")
     printer_config = {
         "idVendor": app.config["ESCPOS_USB_IDVENDOR"],
         "idProduct": app.config["ESCPOS_USB_IDPRODUCT"],
@@ -95,13 +115,11 @@ async def main():
     }
     rich.print(printer_config)
     app.printer = None
-    app.printer = directslip.fax.Printer(printer_config)
+    #app.printer = directslip.fax.Printer(printer_config)
+    app.printer = directslip.printer.Printer(printer_config)
     app.printer.is_printer_ok()  # Forces some init ...
     #bg_task ...
     server = asyncio.create_task(app.start_server(host='0.0.0.0', port=6969, debug=True))
-    print("Server created")
-
-    await server
 
     try:
         # Keep running until the server task finishes or gets canceled
