@@ -1,0 +1,12 @@
+[project]
+name = "server-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "libusb-package>=1.0.26.4",
+    "microdot>=2.6.2",
+    "pydantic>=2.13.4",
+    "python-escpos[usb]>=3.1",
+    "pyusb>=1.3.1",
+    "rich>=15.0.0",
+]

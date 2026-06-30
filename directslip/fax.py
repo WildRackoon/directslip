@@ -4,8 +4,8 @@ import pathlib
 
 import time
 import rich
-import numpy as np
-import PIL
+#import numpy as np # TODO
+import PIL # already within python-escpos
 
 
 import escpos
