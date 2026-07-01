@@ -1,0 +1,8 @@
+[project]
+name = "directslip-server-client"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "gradio>=6.0.2",
+    "rich>=15.0.0",
+]
