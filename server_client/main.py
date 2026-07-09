@@ -2,13 +2,15 @@ import asyncio
 import logging
 import tomllib
 import pathlib
+import io
 
 import rich
+import rich.traceback
 import gradio as gr
+import PIL
 
 import rich
-import urllib
-import urllib.request
+import requests
 import json
 
 import functools
@@ -17,24 +19,48 @@ import functools
 # CONFIG
 BASE_URL="http://192.168.1.13:6969"
 
-# REQUESTION
 
-def send_request(url, payload, method="POST"):
-    try:
-      req = urllib.request.Request(
-          url,
-          data=json.dumps(payload).encode('utf-8'),
-          headers={
-              'Content-Type': 'application/json',
-              #'Accept': 'application/json',
-              #'User-Agent': 'Embedded-Pi-Zero-Client'
-          },
-          method=method
-      )
-      with urllib.request.urlopen(req, timeout=3) as response:
-          return json.loads(response.read().decode('utf-8'))
-    except Exception as exc:
-        rich.print(exc)
+# IAMGE UTILS
+
+# TODO SOMEWHERE ELSE
+def pre_process_image(img, target_size=512):
+    """May rotate and resize"""
+    width, height = img.size
+    if height < width:
+        img = img.rotate(90, expand=True)
+        width, height = img.size  # Update dimensions after rotation
+    if width > target_size:
+        scale_factor = target_size / width
+        new_width = target_size
+        new_height = int(height * scale_factor)
+        img = img.resize((new_width, new_height), PIL.Image.Resampling.LANCZOS)
+    return img
+
+# REQUEST
+def send_request(url, json=None, data=None, method="POST", files=None):
+    # try:
+    res = requests.request(
+        method,
+        url,
+        json=json,  # TODO need data for forms ?
+        data=data,
+        # headers={
+        #     #'Accept': 'application/json',
+        #     #'User-Agent': 'Embedded-Pi-Zero-Client'
+        # },
+        files=files
+    )
+    if not res.ok:
+        try:
+            err_json = res.json()
+        except Exception:
+            err_json = None
+        rich.print("ERROR:", res.status_code, res.text, err_json)  # TODO UNSAFE res.json()
+
+    return res
+
+    # except Exception as exc:
+    #     rich.print("Exception in req:", exc)
 
 # UTILS
 def _clear_inputs(*, number:int):
@@ -49,10 +75,12 @@ def func_clear_input(number:int):
 
 
 # GRADIO
-def process_image(input_img, size):
+def process_image(input_img: PIL.Image.Image, size):
     if input_img is None:
         return "Please upload an image first!"
-    
+
+    input_img = pre_process_image(input_img)
+
     # Example logic based on the selected size
     width, height = input_img.size
     
@@ -63,9 +91,21 @@ def process_image(input_img, size):
     factor=factor_map[int(size)]
     rich.print(f"Must print {factor}")
 
-    # res = send_request(f"{BASE_URL}/api/test", None, method="GET")
-    # res = send_request(f"{BASE_URL}/api/text", {"text": "Hello world"})
-    # rich.print(res)
+    # 1. Convert the PIL Image into bytes in memory
+    byte_arr = io.BytesIO()
+    input_img.save(byte_arr, format='PNG')
+    byte_arr.seek(0)
+
+    res = send_request(
+        f"{BASE_URL}/api/image",
+        data={"metadata": "dummyshit"},
+        files={
+            'image': ('image.png', byte_arr, 'image/png')  # TODO NAME
+        }
+    )
+    rich.print(res.json())
+
+
 
     gr.Success("Success")
 
@@ -75,7 +115,25 @@ def process_image_change(image_path):
     return f"Size: {image_path.size}"
 
 
+
+
+
+
+# TODO TEST AND TEXT
+def req_test():
+    res = send_request(f"{BASE_URL}/api/test", json=None, method="GET")
+    rich.print(res)
+    
+def req_text(text):
+    res = send_request(f"{BASE_URL}/api/text", json={"text": text})
+    rich.print(res)
+
+
 def main():
+
+    # RICH DEBUG
+    rich.traceback.install(show_locals=True)
+
     def get_navbar():
         pass
         navbar = gr.Navbar(
