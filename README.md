@@ -35,8 +35,23 @@ https://support.epson.net/setupnavi/?PINF=menu&MKN=TM-T88V
 https://files.support.epson.com/pdf/pos/bulk/tm-t88v_trg_en_revf.pdf
 
 
----
-TODO
-uv venv 3.14 bare sync in server_api
+
+## Usage
+
+### Server
 source server_api/.venv/bin/activate
 python3 -m server_api.main
+
+### Server Client
+source server_client/.venv/bin/activate
+python3 -m server_client.main
+
+cd server_client
+python.exe -m uv sync
+.\.venv\Scripts\activate
+cd ..
+python.exe -m server_client.main
+
+
+
+
