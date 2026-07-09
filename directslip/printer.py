@@ -120,3 +120,8 @@ class Printer:
         self.p.set_with_default()
 
         self.p.cut() # todo feed=False
+
+    def print_image(self, image):  # TODO ANnotate PIL IMAGE
+        self.p.image(image)
+        self.p.cut()
+

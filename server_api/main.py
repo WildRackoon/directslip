@@ -2,8 +2,12 @@ import asyncio
 import logging
 import tomllib
 import pathlib
+import io
+
+import PIL
 
 import microdot
+import microdot.multipart
 import rich
 
 #import directslip
@@ -65,11 +69,35 @@ async def test(request):
 @api_router.post('/text')
 async def text(request):
     """Perform a test print"""
-    rich.print(request.json)
-    if request.json is None:
-    	return {"error": "Bad Request", "message": "Bad Body"}, 400
-    #request.app.printer.print_text()
+    #rich.print(request.json)
+    if not isinstance(request.json, dict):
+    	return {"error": "Bad Request", "message": "Bad JSON Body"}, 400
+    text = request.json.get("text")
+    if not isinstance(text, str):
+        return {"error": "Bad Request", "message": "Bad Body"}, 400
+    if not text:
+        return {"error": "Bad Request", "message": "Bad Body text"}, 400
+    request.app.printer.print_text(text)
     return {"status": "OK"}, 200
+
+@api_router.post('/image')
+@microdot.multipart.with_form_data
+async def upload_image(request):
+    """Print an Image and cut"""
+    # Microdot handles multipart form data via request.files
+    #rich.print(request.body)
+    #rich.print(request.json, request.form, request.files)
+    #rich.print(request.form.get('image'))
+    if request.files is None or not 'image' in request.files:
+        return Response('No image provided', status_code=400)
+    file = request.files["image"]
+
+    image_load = PIL.Image.open(io.BytesIO(await file.read()))
+    request.app.printer.print_image(image_load)
+    # TODO CLOSE OR SEND ONLY THE STREAM
+
+    return {'status': 'success', 'message': f'Received {file.filename}'}
+
 def cleanup():
   print("cleanup")
 
@@ -98,6 +126,9 @@ def get_config():
 
 
 async def main():
+    microdot.Request.max_content_length = 25*1024*1024
+    microdot.Request.max_body_length = 25*1024*1024
+
     # APP CREATION
     app = microdot.Microdot()
     root_router.mount(api_router, url_prefix='api')
