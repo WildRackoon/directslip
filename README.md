@@ -43,6 +43,9 @@ source server_api/.venv/bin/activate
 python3 -m server_api.main
 
 ### Server Client
+cd server_client
+uv sync
+cd ..
 source server_client/.venv/bin/activate
 python3 -m server_client.main
 
@@ -51,6 +54,11 @@ python.exe -m uv sync
 .\.venv\Scripts\activate
 cd ..
 python.exe -m server_client.main
+
+
+### Server Client Prod
+194.163.159.252
+
 
 
 

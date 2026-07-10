@@ -14,13 +14,15 @@ import requests
 import json
 
 import functools
+import pydantic_settings
 
+# IMAGE UTILS
 
-# CONFIG
-BASE_URL="http://192.168.1.13:6969"
-DRY_RUN=False
+class Settings(pydantic_settings.BaseSettings):
+    BASE_URL: str = "http://192.168.1.13:6969"
+    DRY_RUN: bool = False
 
-# IAMGE UTILS
+settings = Settings()
 
 # TODO SOMEWHERE ELSE
 def pre_process_image(img, target_size=512):
@@ -207,6 +209,8 @@ def main():
     # RICH DEBUG
     rich.traceback.install(show_locals=True)
 
+    rich.print(settings)
+
     def get_navbar():
         pass
         navbar = gr.Navbar(
@@ -282,7 +286,12 @@ def main():
     body > gradio-app > div > div > nav{justify-content: flex-start !important;}
     footer{display:none !important;}
     """
-    demo.launch(css=css)  # 
+    demo.launch(
+        server_name="127.0.0.1",
+        server_port=7860,
+        share=False,              # Disable Gradio's built-in tunnel
+        css=css,
+    )  # 
 
 if __name__ == "__main__":
     main()
