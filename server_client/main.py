@@ -169,27 +169,23 @@ def process_image_change(image_input, *args):
     grid_size=int(grid_size_str)
 
     if image_input is None:
-        return "", None, []
+        return "", []
 
     # Rotate and scale 512xH
-    out_preview = pre_process_image(image_input)
-    out_images=[out_preview]
+    image_normalized = pre_process_image(image_input)
+    out_images=[image_normalized]
 
-    if grid_size < 1:
-        out_preview = mosaic(out_preview, -grid_size)
-        out_images = [out_preview]
-    if grid_size > 1:
-        print(f"TODO SCALE UP")
-        out_images = imgs_scale_up(out_preview, grid_size)
-    else:
-        pass  # nothing
+    if grid_size < 1:  # Scale down as mosaic
+        image_normalized = mosaic(image_normalized, -grid_size)
+        out_images = [image_normalized]
+    if grid_size > 1:  # Scale up organic TODO BAD if image < 512
+        out_images = imgs_scale_up(image_normalized, grid_size)
 
-    rich.print(out_images)
-    rich.print(
-        [x.size for x in out_images]
-    )
+    # TODO STRUCTURED INFO
+    info = {}
 
-    return f"Size: {image_input.size}", out_preview, out_images
+    # return f"Size: {image_input.size}", image_normalized, out_images
+    return f"Size: {image_input.size}", out_images
 
 
 
@@ -234,7 +230,7 @@ def main():
             with gr.Row():
                 input_img = gr.Image(label="Image", height=300, sources=['upload', 'webcam', 'clipboard'], type="pil", image_mode="L")
                 # TODO THE PREVIEW CAN GO
-                img_preview = gr.Image(label="Image Preview", height=300, interactive=False, type="pil", image_mode="L")
+                # img_preview = gr.Image(label="Image Preview", height=300, interactive=False, type="pil", image_mode="L")
                 img_previews = gr.Gallery(label="Images Preview", height=300, interactive=False, type="pil", columns=8, rows=4)
 
             input_status = gr.Textbox(label="ImageStatus", interactive=False, show_label=False, container=False, lines=3)
@@ -252,7 +248,7 @@ def main():
 
         # Changes to Image or inputs
         preview_inputs_list = [input_img, *input_widgets.values()]
-        preview_outputs_list = [input_status, img_preview, img_previews]
+        preview_outputs_list = [input_status, img_previews]
         input_img.change(
             fn=process_image_change,
             inputs=preview_inputs_list,
