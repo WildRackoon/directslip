@@ -18,7 +18,7 @@ import functools
 
 # CONFIG
 BASE_URL="http://192.168.1.13:6969"
-
+DRY_RUN=True
 
 # IAMGE UTILS
 
@@ -38,6 +38,9 @@ def pre_process_image(img, target_size=512):
 
 # REQUEST
 def send_request(url, json=None, data=None, method="POST", files=None):
+    if DRY_RUN:
+        return {"dry_run": "success"}
+
     # try:
     res = requests.request(
         method,
@@ -79,17 +82,24 @@ def process_image(input_img: PIL.Image.Image, size):
     if input_img is None:
         return "Please upload an image first!"
 
-    input_img = pre_process_image(input_img)
 
-    # Example logic based on the selected size
-    width, height = input_img.size
-    
+    # Rotate and scale 512xH
+    input_img = pre_process_image(input_img)
+    # width, height = input_img.size
+    # mosaic = PIL.Image.Image(input_img.mode, input_img.size)
+
+
     factor_map={
         i: 1.0/float(i)
         for i in (1, 2, 3)
     }
     factor=factor_map[int(size)]
     rich.print(f"Must print {factor}")
+
+    # Example logic based on the selected size
+    # width, height = input_img.size
+    # TODO FACTORS    
+
 
     # 1. Convert the PIL Image into bytes in memory
     byte_arr = io.BytesIO()
@@ -103,16 +113,14 @@ def process_image(input_img: PIL.Image.Image, size):
             'image': ('image.png', byte_arr, 'image/png')  # TODO NAME
         }
     )
-    rich.print(res.json())
-
-
-
+    # rich.print(res.json())
     gr.Success("Success")
 
-def process_image_change(image_path):
-    if image_path is None:
-        return ""
-    return f"Size: {image_path.size}"
+def process_image_change(image_input, *args):
+    if image_input is None:
+        return "", None
+    rich.print(args)
+    return f"Size: {image_input.size}", image_input
 
 
 
@@ -154,22 +162,25 @@ def main():
         # with gr.Column():
         # Image Input
         with gr.Group():
-            input_img = gr.Image(label="Image", height=200, sources=['upload', 'webcam', 'clipboard'], type="pil", image_mode="L")
+            with gr.Row():
+                input_img = gr.Image(label="Image", height=200, sources=['upload', 'webcam', 'clipboard'], type="pil", image_mode="L")
+                img_preview = gr.Image(label="Image Preview", height=200, interactive=False, type="pil", image_mode="L")
             input_status = gr.Textbox(label="ImageStatus", interactive=False, show_label=False, container=False, lines=3)
 
         # Exclusive Size Selector (Radio buttons)
         # with gr.Row():
-        size_selector = gr.Radio(
-            choices=["1", "2", "3"], 
-            value="1", 
-            label="Select Output Size"
-        )
-
+        input_widgets = {
+            "size_selector": gr.Radio(
+                choices=["1", "2", "3"], 
+                value="1", 
+                label="Select Output Size"
+            )
+        }
 
         input_img.change(
             fn=process_image_change,
-            inputs=input_img,
-            outputs=[input_status] # COULD AUTO CHOOSE size_selector
+            inputs=[input_img, *input_widgets.values()],
+            outputs=[input_status, img_preview] # COULD AUTO CHOOSE size_selector
         )
 
         # Send Button
@@ -179,7 +190,7 @@ def main():
         # 3. Define the click event logic
         send_btn.click(
             fn=process_image,
-            inputs=[input_img, size_selector],
+            inputs=[input_img, *input_widgets.values()],  # TODO can be a set => means it will give us a **kwargs dict in return
         ).success(
             func_clear_input(1),
             inputs=None,
