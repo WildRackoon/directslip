@@ -38,8 +38,11 @@ def pre_process_image(img, target_size=512):
 
 
 def mosaic(input_img, grid_size: int):
+    """Create a grid of same size of input image, with images scaled down by grid_size"""
     if grid_size == 1:
         return input_img
+    if grid_size <=0:
+        raise RuntimeError(f"mosaic: grid_size cannot be negative or zero")
     
     mosaic = PIL.Image.new(input_img.mode, input_img.size)
 
@@ -56,10 +59,36 @@ def mosaic(input_img, grid_size: int):
 
     return mosaic
 
+def imgs_scale_up(input_img, scale_up: int):
+    """Create N images to scale the whole thing up by `scale_up`"""
+    if scale_up <=0:
+        raise RuntimeError(f"imgs_scale_up: scale_up cannot be negative or zero")
+
+    _width, height = input_img.size  # TODO INCHALLAH ITS 512 man
+    new_width, new_height = 512 * scale_up, height * scale_up
+    # scaled_img = input_img.resize((new_width, new_height), PIL.Image.Resampling.LANCZOS)
+
+    slice_width_source = 512 / scale_up # The exact width of each slice on the original image
+
+    return [
+        input_img.crop(
+            (i * slice_width_source, 0, (i + 1) * slice_width_source, height)  # l t r b
+        ).resize((512, new_height), PIL.Image.Resampling.LANCZOS)
+        for i in range(scale_up)
+    ]
+
+
+
 # REQUEST
-def send_request(url, json=None, data=None, method="POST", files=None):
+def send_request(url, json=None, data=None, method="POST", files=None) -> dict | None:
     if DRY_RUN:
-        return {"dry_run": "success"}
+        res = {
+            "json": json,
+            "data": data,
+            "method": method,
+            "files": files,
+        }
+        return {"dry_run": res}
 
     # try:
     res = requests.request(
@@ -73,14 +102,20 @@ def send_request(url, json=None, data=None, method="POST", files=None):
         # },
         files=files
     )
-    if not res.ok:
-        try:
-            err_json = res.json()
-        except Exception:
-            err_json = None
-        rich.print("ERROR:", res.status_code, res.text, err_json)  # TODO UNSAFE res.json()
 
-    return res
+    try:
+        res_json = res.json()
+    except Exception:
+        res_json = None
+
+    if not res.ok:
+        rich.print("ERROR:", res.status_code, res.text, res_json)
+
+    return {
+        "status": res.status_code,
+        "json": res_json,
+        "text": res.text,
+    }
 
     # except Exception as exc:
     #     rich.print("Exception in req:", exc)
@@ -105,41 +140,56 @@ def pil_to_array(img: PIL.Image.Image):
     return byte_arr
 
 # GRADIO
-def process_image(input_img: PIL.Image.Image):
-    if input_img is None:
-        return "Please upload an image first!"
+def process_image(input_imgs_tuples: PIL.Image.Image):
+    input_imgs = [x[0] for x in input_imgs_tuples]
+    if not input_imgs:
+        return "No images to process"
 
     # TODO ONLY WHEN USING ACTUAL INPUT, MAYBE DO A CHECK HERE ANYWAY
     # input_img = pre_process_image(input_img)
     # width, height = input_img.size
 
     # Convert the PIL Image into bytes in memory
-    img_arr = pil_to_array(input_img)
-
-    res = send_request(
-        f"{BASE_URL}/api/image",
-        data={"metadata": "dummyshit"},
-        files={
-            'image': ('image.png', img_arr, 'image/png')  # TODO NAME
+    for input_img in input_imgs:
+        files = {
+            'image': ('image.png', pil_to_array(input_img), 'image/png')  # TODO NAME
         }
-    )
-    # rich.print(res.json())
+
+        res = send_request(
+            f"{BASE_URL}/api/image",
+            data={"metadata": "dummyshit"},
+            files=files
+        )
+        rich.print(res)
+
     gr.Success("Success")
 
 def process_image_change(image_input, *args):
-    grid_size_str = args[0]
+    grid_size_str = args[0]  # TODO ALREADY AN INT
     grid_size=int(grid_size_str)
 
     if image_input is None:
-        return "", None
+        return "", None, []
 
     # Rotate and scale 512xH
-    out_image = pre_process_image(image_input)
+    out_preview = pre_process_image(image_input)
+    out_images=[out_preview]
 
-    if grid_size != 1:
-        out_image = mosaic(out_image, grid_size)
+    if grid_size < 1:
+        out_preview = mosaic(out_preview, -grid_size)
+        out_images = [out_preview]
+    if grid_size > 1:
+        print(f"TODO SCALE UP")
+        out_images = imgs_scale_up(out_preview, grid_size)
+    else:
+        pass  # nothing
 
-    return f"Size: {image_input.size}", out_image
+    rich.print(out_images)
+    rich.print(
+        [x.size for x in out_images]
+    )
+
+    return f"Size: {image_input.size}", out_preview, out_images
 
 
 
@@ -182,23 +232,27 @@ def main():
         # Image Input
         with gr.Group():
             with gr.Row():
-                input_img = gr.Image(label="Image", height=200, sources=['upload', 'webcam', 'clipboard'], type="pil", image_mode="L")
-                img_preview = gr.Image(label="Image Preview", height=200, interactive=False, type="pil", image_mode="L")
+                input_img = gr.Image(label="Image", height=300, sources=['upload', 'webcam', 'clipboard'], type="pil", image_mode="L")
+                # TODO THE PREVIEW CAN GO
+                img_preview = gr.Image(label="Image Preview", height=300, interactive=False, type="pil", image_mode="L")
+                img_previews = gr.Gallery(label="Images Preview", height=300, interactive=False, type="pil", columns=8, rows=4)
+
             input_status = gr.Textbox(label="ImageStatus", interactive=False, show_label=False, container=False, lines=3)
 
         # Exclusive Size Selector (Radio buttons)
         # with gr.Row():
         input_widgets = {
             "size_selector": gr.Radio(
-                choices=[1, 2, 3], 
+                choices=[-4,-3,-2,1,2] , 
                 value=1, 
-                label="Select Output Size"
+                label="Select Output Size",
+
             )
         }
 
         # Changes to Image or inputs
         preview_inputs_list = [input_img, *input_widgets.values()]
-        preview_outputs_list = [input_status, img_preview]
+        preview_outputs_list = [input_status, img_preview, img_previews]
         input_img.change(
             fn=process_image_change,
             inputs=preview_inputs_list,
@@ -219,7 +273,7 @@ def main():
         send_btn.click(
             fn=process_image,
             # inputs=[input_img, *input_widgets.values()],  # TODO can be a set => means it will give us a **kwargs dict in return
-            inputs=[img_preview],  # TODO can be a set => means it will give us a **kwargs dict in return
+            inputs=[img_previews],  # TODO can be a set => means it will give us a **kwargs dict in return
         ).success(
             func_clear_input(1),
             inputs=None,
