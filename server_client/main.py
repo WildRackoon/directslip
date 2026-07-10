@@ -19,6 +19,11 @@ import pydantic_settings
 # IMAGE UTILS
 
 class Settings(pydantic_settings.BaseSettings):
+    model_config = pydantic_settings.SettingsConfigDict(
+            # Pass the absolute Path object directly to env_file
+            env_file=(".env", "../.env"),
+            env_file_encoding="utf-8"
+        )
     BASE_URL: str = "http://192.168.1.13:6969"
     DRY_RUN: bool = False
 
@@ -83,7 +88,7 @@ def imgs_scale_up(input_img, scale_up: int):
 
 # REQUEST
 def send_request(url, json=None, data=None, method="POST", files=None) -> dict | None:
-    if DRY_RUN:
+    if settings.DRY_RUN:
         res = {
             "json": json,
             "data": data,
@@ -158,7 +163,7 @@ def process_image(input_imgs_tuples: PIL.Image.Image):
         }
 
         res = send_request(
-            f"{BASE_URL}/api/image",
+            f"{settings.BASE_URL}/api/image",
             data={"metadata": "dummyshit"},
             files=files
         )
@@ -196,11 +201,11 @@ def process_image_change(image_input, *args):
 
 # TODO TEST AND TEXT
 def req_test():
-    res = send_request(f"{BASE_URL}/api/test", json=None, method="GET")
+    res = send_request(f"{settings.BASE_URL}/api/test", json=None, method="GET")
     rich.print(res)
     
 def req_text(text):
-    res = send_request(f"{BASE_URL}/api/text", json={"text": text})
+    res = send_request(f"{settings.BASE_URL}/api/text", json={"text": text})
     rich.print(res)
 
 
